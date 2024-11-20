@@ -1,0 +1,117 @@
+<?php 
+session_start(); 
+session.gc_maxlifetime = 1800; 
+
+if (!isset($_SESSION['email']) || !isset($_SESSION['verification_code'])) { 
+  header("Location: register.php"); 
+  exit; 
+} 
+
+$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+  if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+    error_log("CSRF attack detected");
+    exit;
+  }
+
+  $verification_code = $_POST['verification_code'];
+  
+  if (!filter_var($verification_code, FILTER_VALIDATE_INT)) {
+    $error = 'Invalid verification code.';
+  } elseif ($verification_code == $_SESSION['verification_code']) {
+    unset($_SESSION['verification_code']);
+    header('Location: login.php');
+    exit;
+  } else {
+    $error = 'Invalid verification code.';
+  }
+}
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Cash Direct Verification</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      background-color: #0000FF; 
+    }
+    .container { 
+      width: 90%; 
+      margin: 50px auto; 
+      padding: 40px; 
+      border: 1px solid #ccc; 
+      border-radius: 20px; 
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+      background-color:#FFD700;
+    }
+    label { 
+      font-size: 18px; 
+    }
+    input[type="number"] { 
+      width: 100%; 
+      height: 40px; 
+      font-size: 18px; 
+      padding: 10px; 
+      margin-bottom: 20px; 
+    }
+    button[type="submit"] { 
+      width: 100%; 
+      height: 50px; 
+      font-size: 24px; 
+      background-color: #4CAF50; 
+      color: #fff; 
+      border: none; 
+      border-radius: 10px; 
+      cursor: pointer; 
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Verify Your Email</h2>
+    <p>A verification code has been sent to <?php echo $_SESSION['email']; ?>.</p>
+    <p>Please enter the verification code below</p>
+    <form action="" method="post">
+      <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+      <label>Verification Code:</label>
+      <input type="number" name="verification_code" id="verification-code" required=""><br><br>
+      <p id="timer">Time remaining: 1:00 minute</p>
+      <p id="expired-message" style="display:none;">Code has expired. Please <a href="resend_verification.php">resend</a>.</p>
+      <button type="submit" id="verify-button">Verify</button>
+      <?php if (isset($error)) { echo '<p style="color: red;">
+          <ep' . $error . ''; } ?></ep>
+    </form>
+    <p>Didn't receive the verification code? <a href="resend_verification.php">Resend</a></p>
+  </div>
+
+  <script>
+    let countdownTime = 60; 
+    let timerInterval;
+    
+    function startCountdown() {
+      timerInterval = setInterval(() => {
+        countdownTime--;
+        document.getElementById('timer').innerText = `Time remaining: ${formatTime(countdownTime)}`;
+        
+        if (countdownTime <= 0) {
+          clearInterval(timerInterval);
+          document.getElementById('expired-message').style.display = 'block';
+          document.getElementById('verify-button').disabled = true;
+        }
+      }, 1000);
+    }
+    
+    function formatTime(seconds) {
+      let minutes = Math.floor(seconds / 60);
+      let secondsRemaining = seconds % 60;
+      return `${minutes}:${String(secondsRemaining).padStart(2, '0')}`;
+    }
+    
+    startCountdown();
+  </script>
+</body>
+</html>
